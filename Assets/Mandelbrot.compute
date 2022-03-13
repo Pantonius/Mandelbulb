@@ -1,0 +1,132 @@
+#pragma kernel CSMain
+
+RWTexture2D<float4> Result;
+
+float4x4 _CameraPos;
+float4x4 _CameraInverseProjection;
+float3 _LightDirection;
+
+float power;
+float bw;
+float darkness;
+float3 colourA;
+float3 colourB;
+
+bool normalsColour;
+
+static const float distanceThreshold = .0001f;
+static const float maxDistance = 400;
+static const int maxSteps = 400;
+
+struct Ray {
+	float3 origin;
+	float3 direction;
+};
+
+Ray CreateRay(float2 uv) {
+    Ray ray;
+    ray.origin = mul(_CameraPos, float4(0, 0, 0, 1)).xyz; // Origin is the camera
+    ray.direction = mul(_CameraInverseProjection, float4(uv, 0, 1)).xyz; // direction is the projection plane
+    ray.direction = mul(_CameraPos, float4(ray.direction, 0)).xyz;
+    ray.direction = normalize(ray.direction);
+
+    return ray;
+}
+
+// http://blog.hvidtfeldts.net/index.php/2011/09/distance-estimated-3d-fractals-v-the-mandelbulb-different-de-approximations/
+float2 mandelbulb(float3 pos) {
+	float3 z = pos; // z = (x, y, z)
+	float dr = 1.0;
+	float r = 0.0;
+	float iterations = 0;
+
+	for (int i = 0; i < 15; i++) {
+		iterations = i;
+
+		r = length(z);
+		if (r > 2.0) break;
+
+		// convert to polar coordinates
+		float theta = acos(z.z / r);
+		float phi = atan2(z.y, z.x);
+		dr = pow(r, power - 1.0) * power * dr + 1.0;
+
+		// scale and rotate the point
+		float zr = pow(r, power);
+		theta *= power;
+		phi *= power;
+
+		// convert back to cartesian coordinates
+		z = zr * float3(sin(theta) * cos(phi), sin(phi) * sin(theta), cos(theta));
+		z += pos;
+	}
+
+	float distance = 0.5 * log(r) * r / dr;
+
+	return float2(iterations, distance * 1);
+}
+
+float3 calcNormal(float3 pos) {
+    float2 epsilon = float2(distanceThreshold, .0);
+
+    float x = mandelbulb(pos + epsilon.xyy) - mandelbulb(pos - epsilon.xyy);// (pos.x + distThreshold,	pos.y,					pos.z					)
+    float y = mandelbulb(pos + epsilon.yxy) - mandelbulb(pos - epsilon.yxy);// (pos.x,					pos.y + distThreshold,	pos.z					)
+    float z = mandelbulb(pos + epsilon.yyx) - mandelbulb(pos - epsilon.yyx);// (pos.x,					pos.y,					pos.z + distThreshold	)
+
+    return normalize(float3(x, y, z));
+}
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    uint width, height;
+    Result.GetDimensions(width, height);
+
+	float2 iResolution = float2(width, height);
+
+    float2 uv = (2 * id.xy - iResolution.xy) / iResolution.xy;
+	
+	// base color
+	float4 color = float4(0.0, .0, .0, 1);
+
+    // Raymarching
+	Ray ray = CreateRay(uv);
+	float distance = 0;
+	int steps = 0;
+
+	while (steps < maxSteps && distance < maxDistance) {
+		steps++;
+
+		float2 info = mandelbulb(ray.origin);
+		float distEstimate = info.y;
+
+		if (distEstimate < distanceThreshold) { // HIT!
+			// Coloring
+			float escapeIt = info.x;
+			float3 normal = calcNormal(ray.origin);
+
+			float3 mix;
+			float baseColourA = saturate(dot(normal * .65 + .35, -_LightDirection));
+			float baseColourB = saturate(escapeIt / 32);
+
+			if (normalsColour) {
+				mix = saturate(baseColourA * normal + baseColourB * normal);
+			} else {
+				mix = saturate(baseColourA * colourA + baseColourB * colourB);
+			}
+
+			color = float4(mix.xyz, .2);
+			break;
+		}
+
+		ray.origin += ray.direction * distEstimate;
+		distance += distEstimate;
+	}
+
+	float rim = steps / darkness;
+
+	//if (distance >= maxDistance)
+		Result[id.xy] = lerp(color, 1, bw) * rim;
+	/*else
+		Result[id.xy] = color * rim;*/
+}

@@ -1,0 +1,121 @@
+#pragma kernel CSMain
+
+RWTexture2D<float4> Result;
+
+struct Ray {
+    float3 origin;
+    float3 direction;
+};
+
+// Colour
+float3 colourA;
+float3 colourB;
+
+// Fractal
+float power;
+
+// World
+float4x4 _CameraPos;
+float4x4 _CameraInverseProjection;
+float3 _LightDirection;
+
+// http://blog.hvidtfeldts.net/index.php/2011/09/distance-estimated-3d-fractals-v-the-mandelbulb-different-de-approximations/
+float2 mandelbulb(float3 pos) {
+	float3 z = pos;
+	float dr = 1.0;
+	float r = 0.0;
+	float iterations = 0;
+
+	for (int i = 0; i < 15; i++) {
+		iterations = i;
+
+		r = length(z);
+		if (r > 2.0) break;
+
+		// convert to polar coordinates
+		float theta = acos(z.z / r);
+		float phi = atan2(z.y, z.x);
+		dr = pow(r, power - 1.0) * power * dr + 1.0;
+
+		// scale and rotate the point
+		float zr = pow(r, power);
+		theta = theta * power;
+		phi = phi * power;
+
+		// convert back to cartesian coordinates
+		z = zr * float3(sin(theta) * cos(phi), sin(phi) * sin(theta), cos(theta));
+		z += pos;
+	}
+
+	float distance = 0.5 * log(r) * r / dr;
+
+	return float2(iterations, distance);
+}
+
+float2 castRay(Ray ray) {
+	float t = 0.0;
+
+	for (int i = 0; i < 100; i++) {
+		// current position of the ray
+		float3 pos = ray.origin + t * ray.direction;
+
+		// mandelbulb information (x: iterations, y: distance)
+		float2 info = mandelbulb(pos);
+		float distance = info.y;
+				
+		if (distance < 0.001) return float2(t, info.x); // Ray has hit a surface
+
+		t += distance;
+
+		if (t > 200.0) return float2(-1.0, info.x); // Ray goes to "infinity"
+	}
+
+	return float2(-1, -1);
+}
+
+float3 calcNormal(float3 pos) {
+	float2 epsilon = float2(.0001, .0);
+
+	float x = mandelbulb(pos + epsilon.xyy) - mandelbulb(pos - epsilon.xyy);
+	float y = mandelbulb(pos + epsilon.yxy) - mandelbulb(pos - epsilon.yxy);
+	float z = mandelbulb(pos + epsilon.yyx) - mandelbulb(pos - epsilon.yyx);
+
+	return normalize(float3(x, y, z));
+}
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+	uint width, height;
+	Result.GetDimensions(width, height);
+
+	float2 uv = id.xy / float2(width, height);
+
+	// stolen from Sebstian Lague: Background gradient
+	float4 color = lerp(float4(51, 3, 20, 1), float4(16, 6, 28, 1), uv.y) / 255.0;
+
+    // Ray Origin + Direction
+	Ray ray;
+	ray.origin = mul(_CameraPos, float4(0, 0, 0, 1)).xyz;					// camera position in world
+	ray.direction = mul(_CameraInverseProjection, float4(uv, 0, 1)).xyz;	// direction relative to camera
+	ray.direction = mul(_CameraPos, float4(ray.direction, 0)).xyz;				// ... corrected for camera facing
+	ray.direction = normalize(ray.direction);									// ... and normalized
+
+	// Raymarching
+	float2 castingResult = castRay(ray); // x: t, y: iterations
+	float t = castingResult.x;
+	float iterations = castingResult.y;
+
+	if(t > 0.0) {
+		float3 pos = ray.origin + t * ray.direction;
+		float3 normal = calcNormal(pos);
+
+		// Colors
+		float light = saturate(dot(normal * .5 + .5, -_LightDirection));
+		float dark = saturate(iterations / 16.0);
+		color = float4(saturate(light * colourA + dark * colourB).xyz, 1);
+	}
+
+	float rim = t/16;
+    Result[id.xy] = lerp(color, 1, 0.0) * rim;
+}
