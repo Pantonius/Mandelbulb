@@ -6,10 +6,13 @@ public class CameraTrack : MonoBehaviour
 {
     public float interpolateAmount = 0;
     public int splineNumber = 0;
-    public int splineLength = 0;
     public float speed = 20;
 
-    [SerializeField] private List<Vector3> pointList;
+    //public SplineSettings splineSettings;
+    [HideInInspector]
+    public Spline spline;
+    [HideInInspector]
+    public bool splineSettingsFoldout;
 
     // Start is called before the first frame update
     void Start()
@@ -21,19 +24,30 @@ public class CameraTrack : MonoBehaviour
     void Update()
     {
         //transform.RotateAround(new Vector3(0, 0, 0), Vector3.up, speed * Time.deltaTime);
-        splineLength = pointList.Count / 4;
-
         interpolateAmount += Time.deltaTime * speed / 20;
 
-        if(interpolateAmount > 1f)
+        splineNumber = (int)interpolateAmount;
+        if (splineNumber + 1 < spline.Length())
         {
-            splineNumber = (splineNumber + 1) % splineLength;
+            Spline.Point pointA = spline.GetPoint(splineNumber);
+            Spline.Anchor anchorA = spline.GetAnchor(splineNumber);
 
-            interpolateAmount--;
+            Spline.Point pointB = spline.GetPoint(splineNumber + 1);
+            Spline.Anchor anchorB = spline.GetAnchor(splineNumber + 1);
+
+
+            transform.position = cubicBezier(pointA.position, anchorA.position, anchorB.position, pointB.position, interpolateAmount % 1f);
+        } else
+        {
+            interpolateAmount = 0;
         }
 
-        transform.position = cubicBezier(pointList[splineNumber], pointList[splineNumber + 1], pointList[splineNumber + 2], pointList[splineNumber + 3], interpolateAmount);
         transform.LookAt(Vector3.zero);
+    }
+
+    public void OnSplineUpdated()
+    {
+        //spline = splineSettings.spline;
     }
 
     Vector3 linearBezier(Vector3 x1, Vector3 x2, float t) { // interpolation between x1 and x2 by t
@@ -53,7 +67,6 @@ public class CameraTrack : MonoBehaviour
 
         return linearBezier(a, b, t);
     }
-
 
     // https://youtu.be/aVwxzDHniEw?t=378
     Vector3 polyBez(Vector3 x1, Vector3 x2, Vector3 c1, Vector3 c2, float t)
