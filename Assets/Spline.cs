@@ -2,39 +2,47 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-[CreateAssetMenu(menuName = "Spline")]
-public class Spline : ScriptableObject
+[Serializable]
+public class Spline
 {
-    [SerializeField] public List<Point> pointList;
-    [SerializeField] public List<Anchor> anchorList;
+    [SerializeField] public List<Vector3> points;
+
+    public Spline(Vector3 centre)
+    {
+        points = new List<Vector3>
+        {
+            centre + Vector3.left,
+            centre + (Vector3.left + Vector3.up) * .5f,
+            centre + (Vector3.right + Vector3.down) * .5f,
+            centre + Vector3.right
+        };
+    }
 
     public int Length()
     {
-        return pointList.Count;
+        return points.Count;
     }
 
-    public Point GetPoint(int index)
+    public int CountSegments()
     {
-        return pointList[index];
+        return (Length() - 4) / 3 + 1;
     }
 
-    public Anchor GetAnchor(int index)
+    public Vector3 GetPoint(int index)
     {
-        return anchorList[index];
+        return points[index];
+    }
+    public void AddSegment(Vector3 pos)
+    {
+        points.Add(points[Length() - 1] * 2 - points[Length() - 2]); // Control
+        points.Add((points[Length() - 1] + pos) * .5f); // Control
+        points.Add(pos); // Point
     }
 
-    [Serializable]
+    /*[Serializable]
     public class Point
     {
-        public float t;
         public Vector3 position;
-        public Vector3 forward;
-        public Vector3 normal;
-    }
-
-    [Serializable]
-    public class Anchor
-    {
-        public Vector3 position;
-    }
+        public Vector3 anchor;
+    }*/
 }

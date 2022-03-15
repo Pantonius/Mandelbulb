@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0.44657844, g: 0.49641222, b: 0.57481694, a: 1}
+  m_IndirectSpecularColor: {r: 0.44657898, g: 0.4964133, b: 0.5748178, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -233,7 +233,7 @@ Camera:
   m_FOVAxisMode: 0
   m_SensorSize: {x: 36, y: 24}
   m_LensShift: {x: 0, y: 0}
-  m_FocalLength: 50
+  m_FocalLength: 35.55461
   m_NormalizedViewPortRect:
     serializedVersion: 2
     x: 0
@@ -242,7 +242,7 @@ Camera:
     height: 1
   near clip plane: 0.3
   far clip plane: 1000
-  field of view: 26.991467
+  field of view: 37.300003
   orthographic: 0
   orthographic size: 5
   m_Depth: -1
@@ -287,18 +287,18 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   mandelbulb: {fileID: 7200000, guid: 081c996effb96d64fadb838f193a1ca9, type: 3}
-  power: 7
-  darkness: 70
+  power: 0.5
+  darkness: 400
   normalsColour: 0
-  blackAndWhite: 0.03
+  blackAndWhite: 1
   redA: 0
   greenA: 0
   blueA: 1
   redB: 1
   greenB: 0
   blueB: 0.426
-  animate: 0
-  powerSpeed: 1
+  animate: 1
+  powerSpeed: 0.2
 --- !u!114 &719401210
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -313,8 +313,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   interpolateAmount: 0
   splineNumber: 0
-  speed: 4
-  spline: {fileID: 11400000, guid: 3cd3ff34ec5eb904c82c401b15fa34e7, type: 2}
+  speed: 2
+  spline:
+    points: []
   splineSettingsFoldout: 0
 --- !u!1 &1985067302
 GameObject:
